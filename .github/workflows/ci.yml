@@ -1,0 +1,63 @@
+name: CI FreshAuthz
+
+# Runs the Python and Rego suites with pinned Python and OPA versions.
+# The end-to-end Python+OPA test runs against REAL OPA and MUST NOT be skipped.
+# No deployment, package publishing or containers.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  # Pinned OPA version. Bump it deliberately; the checksum is verified against
+  # the .sha256 file published in the same official release.
+  OPA_VERSION: "1.4.0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install OPA (pinned version + published checksum verification)
+        run: |
+          set -euo pipefail
+          base="https://openpolicyagent.org/downloads/v${OPA_VERSION}"
+          curl -fsSL "${base}/opa_linux_amd64_static" -o opa
+          curl -fsSL "${base}/opa_linux_amd64_static.sha256" -o opa.sha256
+          # The published .sha256 may reference the remote name; normalise to ./opa.
+          echo "$(awk '{print $1}' opa.sha256)  opa" | sha256sum -c -
+          chmod +x opa
+          sudo mv opa /usr/local/bin/opa
+          opa version
+
+      - name: Python tests (includes real OPA integration)
+        run: |
+          set -euo pipefail
+          # OPA is already on PATH: the end-to-end test MUST NOT be skipped.
+          python -m unittest -v 2>&1 | tee unittest.log
+          if grep -Eq "TestRealOpaIntegration.*(skipped| \.\.\. skipped)" unittest.log; then
+            echo "ERROR: the end-to-end test with real OPA was skipped."; exit 1
+          fi
+
+      - name: Rego — canonical format
+        run: opa fmt --fail policy.rego policy_test.rego
+
+      - name: Rego — strict check
+        run: opa check --strict policy.rego policy_test.rego
+
+      - name: Rego — tests with coverage
+        run: opa test policy.rego policy_test.rego --coverage
