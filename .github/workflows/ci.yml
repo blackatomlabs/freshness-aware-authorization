@@ -15,9 +15,11 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.11"
-  # Pinned OPA version. Bump it deliberately; the checksum is verified against
-  # the .sha256 file published in the same official release.
+  # Pinned OPA version and the SHA-256 of its official linux/amd64 static
+  # binary (taken from the .sha256 file of the GitHub release). Bump both
+  # together, deliberately.
   OPA_VERSION: "1.4.0"
+  OPA_SHA256: "1a2337dbd75d623d759c9e47f64564f101b6923b069663f06f14377b6bb83119"
 
 jobs:
   test:
@@ -32,14 +34,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install OPA (pinned version + published checksum verification)
+      - name: Install OPA (pinned version and pinned SHA-256)
         run: |
           set -euo pipefail
-          base="https://openpolicyagent.org/downloads/v${OPA_VERSION}"
-          curl -fsSL "${base}/opa_linux_amd64_static" -o opa
-          curl -fsSL "${base}/opa_linux_amd64_static.sha256" -o opa.sha256
-          # The published .sha256 may reference the remote name; normalise to ./opa.
-          echo "$(awk '{print $1}' opa.sha256)  opa" | sha256sum -c -
+          curl -fsSL "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_amd64_static" -o opa
+          echo "${OPA_SHA256}  opa" | sha256sum -c -
           chmod +x opa
           sudo mv opa /usr/local/bin/opa
           opa version
