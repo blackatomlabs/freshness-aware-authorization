@@ -1,4 +1,4 @@
-"""Unit tests for freshauthz (v5.0.0). Real `opa` is mocked, except in TestRealOpaIntegration."""
+"""Unit tests for freshauthz (v5.0.1). Real `opa` is mocked, except in TestRealOpaIntegration."""
 
 import json
 import math
@@ -40,7 +40,7 @@ def valid_result(**over):
         "unused_exception_present": False,
         "validation_errors": [],
         "evaluated_at": "2026-06-28T10:15:00Z",
-        "policy_version": "5.0.0",
+        "policy_version": "5.0.1",
     }
     base.update(over)
     return base
@@ -111,7 +111,7 @@ class TestValidateResult(unittest.TestCase):
 
     def test_wrong_version(self):
         with self.assertRaises(EvaluationError):
-            self.v(valid_result(policy_version="2.3.1"))
+            self.v(valid_result(policy_version="0.0.0"))
 
     def test_wrong_rule(self):
         with self.assertRaises(EvaluationError):
@@ -429,9 +429,9 @@ class TestEvaluate(unittest.TestCase):
                 evaluate(valid_input(), policy_path=self.policy, allow_custom_policy=True)
 
     def test_full_path_with_mocked_subprocess(self):
-        salida = _opa_json(valid_result())
+        opa_stdout = _opa_json(valid_result())
         with mock.patch.object(ri, "_resolve_opa", return_value="/opa"), \
-             mock.patch.object(ri.subprocess, "run", return_value=_proc(stdout=salida)):
+             mock.patch.object(ri.subprocess, "run", return_value=_proc(stdout=opa_stdout)):
             r = evaluate(valid_input(), policy_path=self.policy, allow_custom_policy=True)
             self.assertEqual(r["reason_code"], "ALLOW_UNIT_MATCH")
 

@@ -1,6 +1,6 @@
 """
 Minimal Python integration for Freshness-aware Authorization (FreshAuthz),
-rule SYS-0002-R01 (v5.0.0).
+rule SYS-0002-R01 (v5.0.1).
 
 Trust boundary
 --------------
@@ -61,7 +61,7 @@ _DEFAULT_POLICY = Path(__file__).with_name("policy.rego")
 _QUERY = "data.freshauthz.records.result"
 _DEFAULT_TIMEOUT = 5.0
 
-_EXPECTED_POLICY_VERSION = "5.0.0"
+_EXPECTED_POLICY_VERSION = "5.0.1"
 _EXPECTED_RULE = "SYS-0002-R01"
 
 _ASSIGNMENT_STATUSES: set[str] = {"FRESH", "STALE", "UNAVAILABLE"}

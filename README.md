@@ -17,7 +17,7 @@ as `SYS-0002-R01`.
 | Laboratory | Black Atom Labs · asset `SYS-0002` |
 | Research line | RL-01 · Coherence-Aware Decision & Policy Systems |
 | Status · Exposure | Reference implementation · Public |
-| Version | 5.0.0 (November 2026) |
+| Version | 5.0.1 (November 2026) |
 | Author | Antonio Tena Salguero |
 
 ---
@@ -118,7 +118,7 @@ Four decisions, seven reason codes.
 
 ```
 .
-├── .github/workflows/ci.yml   # CI with OPA pinned by version and checksum
+├── .github/workflows/ci.yml   # CI with OPA pinned by version and SHA-256
 ├── .gitignore
 ├── LICENSE                    # Apache License 2.0
 ├── NOTICE                     # Copyright and attribution
@@ -133,7 +133,7 @@ Four decisions, seven reason codes.
 
 ## How it is tested
 
-Requirements: Python 3.10+ (uses `match`) and OPA on `PATH`.
+Requirements: Python 3.10 or later and OPA on `PATH` (CI uses OPA 1.4.0).
 
 ```bash
 python3 -m unittest -v
@@ -142,8 +142,8 @@ opa check --strict policy.rego policy_test.rego
 opa test policy.rego policy_test.rego --coverage
 ```
 
-144 tests in total (80 Rego, 64 Python), with about 97% line coverage of
-`policy.rego` as reported by `opa test --coverage`. The tests cover the happy
+144 tests in total (80 Rego, 64 Python), with 96.9% line coverage of
+`policy.rego` as reported by `opa test --coverage` (OPA 1.4.0). The tests cover the happy
 paths, but mostly the ones that are not: impossible dates, exceptions with an
 inverted window, `max_age` set to zero, contradictions between status and
 timestamp, input roots that are not objects, leap seconds.
@@ -189,6 +189,6 @@ are in [`contract.md`](contract.md).
 
 ## License
 
-Copyright 2026 Antonio Tena Salguero, Black Atom Labs.
+Copyright 2026 Antonio Tena Salguero.
 
 Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

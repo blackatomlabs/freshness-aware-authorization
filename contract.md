@@ -1,6 +1,6 @@
 # Policy contract — Freshness-aware Authorization (rule SYS-0002-R01)
 
-> **Policy version: 5.0.0.** Changes from previous versions are at the end, under **Changelog**.
+> **Policy version: 5.0.1.** Version history is at the end, under **Changelog**.
 >
 > **Specialised PDP.** This project decides record access based on an **already resolved** action authorization, unit match, assignment freshness and approved exceptions. It runs **behind a trusted PEP/backend** that builds the entire input (identity from IAM, already resolved permissions, assignment from the records system, exception from an authorised store, and server time). **The end client never builds the input.** The policy does not authenticate, does not manage identities or roles, does not compute permissions, does not query databases and does not administer exceptions: it only checks consistency and applicability over trusted data.
 
@@ -70,8 +70,8 @@ Fields:
 **Design note (responsibilities and consistency):**
 
 - **Computing the state (`FRESH`/`STALE`/`UNAVAILABLE`) lives in the adapter, outside Rego.** The policy decides *what to do* given a state, not *how to compute* the state. The assignment and the exception are evaluated **independently**: they are two distinct sources that can fall out of sync.
-- **Exception freshness: modelled, not assumed.** In 2.0.0, `exception.source_status` was accepted without cross-checking. Since 2.1.0 the exception carries its own `source_timestamp` and `source_max_age_seconds`, and Rego validates that `source_status` does not contradict that age (same criterion as the assignment). Modelling the freshness of the exception source was preferred over declaring it inside the trust base, so that an exception declared `FRESH` over an expired record is rejected as invalid input instead of granting access.
-- **Rego does NOT recompute freshness, but it DOES detect contradictions.** For this prototype it was an explicit choice that Rego cross-check the declared `assignment_status` against the computed age `now − assignment_timestamp` versus `assignment_max_age_seconds`. Convention: `age ≤ max_age ⇒ FRESH`; `age > max_age ⇒ STALE`. If the declared state contradicts that relation (for example `status = FRESH` but `age > max_age`), the input is considered **invalid** and `DENY_INVALID_INPUT` is returned. Rego does not overwrite the adapter's state: it rejects it when incoherent.
+- **Exception freshness: modelled, not assumed.** The exception carries its own `source_timestamp` and `source_max_age_seconds`, and Rego validates that `source_status` does not contradict that age (same criterion as the assignment). Modelling the freshness of the exception source was preferred over declaring it inside the trust base, so that an exception declared `FRESH` over an expired record is rejected as invalid input instead of granting access.
+- **Rego does NOT recompute freshness, but it DOES detect contradictions.** It is an explicit design choice that Rego cross-checks the declared `assignment_status` against the computed age `now − assignment_timestamp` versus `assignment_max_age_seconds`. Convention: `age ≤ max_age ⇒ FRESH`; `age > max_age ⇒ STALE`. If the declared state contradicts that relation (for example `status = FRESH` but `age > max_age`), the input is considered **invalid** and `DENY_INVALID_INPUT` is returned. Rego does not overwrite the adapter's state: it rejects it when incoherent.
 - **Temporal comparison by instant, not by string.** All instants are converted to nanoseconds with `time.parse_rfc3339_ns` before being compared. This makes the comparison correct even when `now` and the exception window arrive with **different time offsets** (for example `Z` vs `+02:00`), which a lexical string comparison would get wrong.
 
 **Temporal rules (normative summary):**
@@ -104,7 +104,7 @@ The policy **always** returns a structured, complete `result` object (query `dat
   "unused_exception_present": false,
   "validation_errors": [],
   "evaluated_at": "2026-06-28T10:15:00Z",
-  "policy_version": "5.0.0"
+  "policy_version": "5.0.1"
 }
 ```
 
@@ -214,137 +214,17 @@ The `freshauthz.py` module wraps `opa eval` via subprocess and adds guarantees a
 - **Minimal audit.** `build_audit_record()` first revalidates the response against the contract and the original request, and then builds (without persisting) a dictionary with actor, unit, record, action, state, decision, `reason_code`, `execution_allowed`, `applied_exception_id`, `approved_by`, `evaluated_at`, version and SHA-256 of the policy. The consumer decides where to store it.
 - **Performance limitation.** Each evaluation spawns an `opa eval` **subprocess**; suitable for moderate volumes, not for very high-throughput paths. An OPA Server/sidecar or bundles are **out of scope** for this version.
 
-## Migration 4.0.0 → 5.0.0
+## Changelog
 
-A **major** change: the project is renamed from RCI to **Freshness-aware
-Authorization (FreshAuthz)**, a name that says what it does. Every identifier
-derived from the old name changes. Decision semantics, freshness rules, the
-input schema and the output fields are **unchanged**.
+### 5.0.1
 
-| 4.0.0 | 5.0.0 |
-|---|---|
-| query `data.rci.exp001.result` | query `data.freshauthz.records.result` |
-| Rego package `rci.exp001` | Rego package `freshauthz.records` |
-| rule `RCI-EXP-001` | rule `SYS-0002-R01` (the lab's permanent identifier for this rule) |
-| `RCI_ALLOW_UNIT_MATCH` | `ALLOW_UNIT_MATCH` |
-| `RCI_ALLOW_EXCEPTION_APPLIED` | `ALLOW_EXCEPTION_APPLIED` |
-| `RCI_DENY_UNIT_MISMATCH` | `DENY_UNIT_MISMATCH` |
-| `RCI_DENY_ACTION_NOT_ALLOWED` | `DENY_ACTION_NOT_ALLOWED` |
-| `RCI_DENY_SOURCE_UNAVAILABLE` | `DENY_SOURCE_UNAVAILABLE` |
-| `RCI_DENY_INVALID_INPUT` | `DENY_INVALID_INPUT` |
-| `RCI_ESCALATE_STALE_ASSIGNMENT` | `ESCALATE_STALE_ASSIGNMENT` |
-| Python module `rci_integration.py` | Python module `freshauthz.py` |
-| `policy_version` `"4.0.0"` | `policy_version` `"5.0.0"` |
+Documentation and CI only. The decision logic, the reason codes and the input/output schema are unchanged; `policy_version` now reports `5.0.1`.
 
-## Migration 3.0.0 → 4.0.0
+- The version history of earlier, unpublished versions was removed from this contract and from the header of `policy.rego`.
+- CI now verifies the OPA binary against a SHA-256 checksum pinned in the workflow.
+- Contract wording aligned with the maturity label: this is a reference implementation.
+- README corrections: copyright notice, Python requirement, coverage figure and CI description.
 
-A **major** change: every schema key is renamed from Spanish to English. The
-decision semantics, the freshness rules and the `RCI_*` reason codes are
-**unchanged** — only the field names change.
+### 5.0.0
 
-| 3.0.0 | 4.0.0 |
-|---|---|
-| `actor.unidad` | `actor.unit` |
-| `actor.acciones_permitidas` | `actor.allowed_actions` |
-| `resource.expediente_id` | `resource.record_id` |
-| `resource.unidad_asignada` | `resource.assigned_unit` |
-| `resource.asignacion_status` | `resource.assignment_status` |
-| `resource.asignacion_timestamp` | `resource.assignment_timestamp` |
-| `resource.asignacion_max_age_seconds` | `resource.assignment_max_age_seconds` |
-| `excepcion` | `exception` |
-| `excepcion.expediente_id` | `exception.record_id` |
-| `excepcion.acciones_autorizadas` | `exception.authorised_actions` |
-| `excepcion.vigente_desde` | `exception.valid_from` |
-| `excepcion.vigente_hasta` | `exception.valid_until` |
-| `excepcion.fuente_status` | `exception.source_status` |
-| `excepcion.fuente_timestamp` | `exception.source_timestamp` |
-| `excepcion.fuente_max_age_seconds` | `exception.source_max_age_seconds` |
-| `excepcion.aprobada_por` | `exception.approved_by` |
-| `regla` (output) | `rule` |
-| `expediente_id` (output) | `record_id` |
-| `asignacion_status` (output) | `assignment_status` |
-| `excepcion_id_aplicada` (output) | `applied_exception_id` |
-| `excepcion_existente_no_utilizada` (output) | `unused_exception_present` |
-| query `data.rci.exp001.resultado` | query `data.rci.exp001.result` |
-
-`actor.id`, `action`, `now`, `exception.id`, `exception.actor_id`, `decision`,
-`reason_code`, `execution_allowed`, `actor_id`, `validation_errors`,
-`evaluated_at` and `policy_version` are unchanged. The `RCI_*` reason codes are
-a closed, stable enum and are **not** renamed.
-
-The Python module is now `rci_integration.py` (was `integracion_rci.py`) and its
-public API is in English: `evaluate()`, `get_decision()`, `access_allowed()`,
-`build_audit_record()`, `policy_sha256()`, `EvaluationError`, `OPAUnavailable`,
-`DecisionRequiresExplicitHandling`.
-
-## Migration 2.3.1 → 3.0.0
-
-A **major** change (input and decisions change). To migrate:
-
-1. **Input:** add `actor.allowed_actions` (array of non-empty strings, **required**) to every request. If it is missing or not an array → `RCI_DENY_INVALID_INPUT`.
-2. **New decision:** handle `RCI_DENY_ACTION_NOT_ALLOWED` (valid input but `action ∉ allowed_actions`). Not to be confused with `RCI_DENY_INVALID_INPUT`. It is evaluated **before** units and exceptions; an exception cannot grant a disallowed action.
-3. **Version:** `policy_version` becomes `"3.0.0"` in the policy, contract, integration and tests.
-4. **Python consumer:** `evaluar(...)` takes **keyword-only** arguments (`policy_path=`, `permitir_politica_personalizada=`, `timeout=`, `opa_path=`) and returns the **normalised** result. `acceso_permitido()` now **raises** `DecisionRequiereTratamientoExplicito` for `ALLOW_WITH_EXCEPTION` and `ESCALATE`; use `obtener_decision()` + `match` for exhaustive handling.
-5. No changes to the freshness rules, the exceptions or the adapter's responsibility.
-
-## Changelog 5.0.0 (project renamed)
-
-1. **Project renamed** from RCI to Freshness-aware Authorization (FreshAuthz).
-2. **Identifiers renamed** accordingly: query, Rego package, reason codes (the
-   `RCI_` prefix is dropped; the `rule` field already identifies the policy) and
-   Python module. The rule now carries the lab's permanent identifier,
-   `SYS-0002-R01`, which will not change if the project is renamed again. See
-   the migration table above.
-3. **No change to decision semantics**, input schema, output fields, freshness
-   rules, exception handling or the trust boundary.
-
-## Changelog 4.0.0 (English schema)
-
-1. **All schema keys renamed from Spanish to English** (see the migration table
-   above). Breaking change for any consumer sending the previous format.
-2. **OPA query renamed**: the output rule is now `data.rci.exp001.result` (was `data.rci.exp001.resultado`). Any consumer querying OPA directly must update the query.
-3. **Public Python API renamed to English**; the module is now
-   `rci_integration.py`.
-4. **`RCI_*` reason codes unchanged**: they remain a closed, stable enum.
-5. **No change to decision semantics**, freshness rules, exception handling or
-   the trust boundary.
-
-## Changelog 3.0.0 (per-action authorization + trust boundary)
-
-1. **`actor.allowed_actions`** (array of non-empty strings, required): list of actions **already resolved** by the corporate system (trusted data from the PEP). The policy only checks membership; it does not compute roles or permissions.
-2. **New decision `RCI_DENY_ACTION_NOT_ALLOWED`**: valid input but disallowed action. Checked **before** units and exceptions; an exception cannot grant an action absent from the list.
-3. **Documented trust boundary**: specialised PDP behind a trusted PEP; the end client does not build the input.
-4. **Hardened Python integration**: response↔request binding, output normalisation, strict serialisation, timeout validation, safe binary execution, bundled policy + SHA-256, minimal audit, and explicit handling of `ALLOW_WITH_EXCEPTION`/`ESCALATE`.
-5. **Documentation fix** of the year range to `1678..2261` inclusive (the mention of `2262` is removed).
-
-## Changelog 2.3.1 (audit echo sanitisation)
-
-17. **Audit echoes sanitised by type.** `actor_id`, `record_id`, `assignment_status` and `evaluated_at` reflect the input value only if it has the contractual type (string; enum for `assignment_status`); otherwise they return `null`. This avoids dragging mistyped values (for example a numeric `actor_id`) into the metadata when rejecting an invalid input. It does **not** change the decision, `reason_code` or `validation_errors`.
-
-## Changelog 2.3.0 (hardening)
-
-15. **Date representability.** Shape and calendar are not enough: the year is limited to the range representable as `int64` nanoseconds (~1678–2261), and `time.parse_rfc3339_ns` is required to return a number before it is used. Years such as `0000`/`9999` → `RCI_DENY_INVALID_INPUT` without aborting.
-16. **Empty strings rejected** in `actor.id`, `actor.unit`, `action`, `resource.record_id`, `resource.assigned_unit`, and in `exception.id`, `exception.actor_id`, `exception.record_id`, `exception.approved_by`.
-
-## Changelog 2.2.0 (hardening)
-
-11. **Input root validated.** If `input` is not an object (null, string, array, number) → `RCI_DENY_INVALID_INPUT`, with `resultado` still defined.
-12. **Coherent exception window.** `valid_from > valid_until` is rejected.
-13. **`authorised_actions` sanitised.** It must be an array of non-empty strings.
-14. **Impossible-date-proof parsing.** Calendar validation (month, day with leap years, hour, offset) before parsing; `time.parse_rfc3339_ns` only receives real dates, so the policy does not fail even under `--strict-builtin-errors`.
-
-## Changelog 2.1.0
-
-7. **`exception` genuinely required.** The **key** is validated to exist even when its value is `null`; if it is missing, `RCI_DENY_INVALID_INPUT` (previously a missing key was treated as `null`).
-8. **New assignment validations:** `assignment_timestamp <= now` (a future timestamp cannot be FRESH) and `assignment_max_age_seconds >= 0`.
-9. **Exception freshness modelled.** New `exception.source_timestamp` and `exception.source_max_age_seconds` (required if `source_status` is FRESH/STALE); Rego validates that `source_status` does not contradict the real age of the source, as it does for the assignment.
-10. **Contract wording:** "the exception is not evaluated" → "the exception does not change the authorization decision".
-
-## Changelog 2.0.0
-
-1. **An exception must always be `FRESH` to grant access.** `excepcion_valida` requires `exception.source_status == "FRESH"` with both `FRESH` and `STALE` assignments. A `STALE`/`UNAVAILABLE` exception no longer compensates for a unit mismatch or a stale assignment.
-2. **Temporal comparison by instant.** `now`, `valid_from`, `valid_until` (and `assignment_timestamp`) are parsed with `time.parse_rfc3339_ns`; string comparisons are gone. Correct in the presence of time offsets.
-3. **Always-structured result + input validation.** New `reason_code` `RCI_DENY_INVALID_INPUT` and new field `validation_errors`. For absent/incomplete/mistyped input, the policy returns a complete `resultado` instead of being undefined.
-4. **Unified `outcome`.** `decision`, `reason_code` and `execution_allowed` are emitted from a single object, preventing separate rules from contradicting each other.
-5. **`exception.id` (input) and `applied_exception_id` (output).** Traceability of which specific exception was applied.
-6. **Detection of state/timestamp/max_age contradictions.** Rego trusts the adapter for the state, but rejects as `RCI_DENY_INVALID_INPUT` those inputs where the declared state contradicts the computed age.
+First public version. Earlier versions were internal and are not published.

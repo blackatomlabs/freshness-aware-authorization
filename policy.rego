@@ -6,76 +6,32 @@ import rego.v1
 # Freshness-aware Authorization (rule SYS-0002-R01)
 # Procedural consistency for record access
 #
-# A purely declarative policy. Changes from 1.0.0 (see contract.md,
-# section "Changelog 2.0.0"):
+# A purely declarative policy. What it guarantees (details in contract.md):
 #
-#   1. Any exception granting access requires `source_status == "FRESH"`,
-#      with both FRESH and STALE assignments.
-#   2. Instants (`now`, `valid_from`, `valid_until`, `assignment_timestamp`)
-#      are compared as nanoseconds via `time.parse_rfc3339_ns`, never as
-#      strings.
-#   3. The policy ALWAYS returns a structured result. If the input does not
-#      meet the contract -> DENY / DENY_INVALID_INPUT with
+#   1. The result is ALWAYS defined and structured. Input that does not meet
+#      the contract -> DENY / DENY_INVALID_INPUT with an ordered list of
 #      `validation_errors`.
-#   4. `decision`, `reason_code` and `execution_allowed` are emitted together
-#      in a single `outcome` object, so they cannot fall out of sync across
-#      rules.
-#   5. New `exception.id` in the input and `applied_exception_id` in the output.
-#   6. Rego does NOT recompute the status, but it DOES detect contradictions
-#      between `assignment_status`, `assignment_timestamp` and
-#      `assignment_max_age_seconds`, and treats them as invalid input.
-#
-# Changes in 2.1.0:
-#   7. `exception` is required: the KEY must exist even when its value is null.
-#   8. New validations: `assignment_timestamp <= now` (no future values),
-#      `assignment_max_age_seconds >= 0`.
-#   9. Exception freshness is modelled like assignment freshness:
-#      `exception.source_timestamp` + `exception.source_max_age_seconds`, and
-#      `source_status` is validated against the real age.
-#
-# Changes in 2.2.0 (hardening):
-#  10. The input root is validated to be an object (null/string/array ->
-#      invalid).
-#  11. Exceptions with `valid_from` later than `valid_until` are rejected.
-#  12. `authorised_actions` must be an array of NON-empty strings.
-#  13. Dates: calendar validation (for example 2026-02-31 is rejected) BEFORE
-#      parsing. `time.parse_rfc3339_ns` only ever receives validated dates, so
-#      the policy does not abort even under --strict-builtin-errors.
-#
-# Changes in 2.3.0 (hardening):
-#  14. Representability: beyond shape and calendar, the year is limited to the
-#      range OPA can represent as int64 nanoseconds (~1678..2261), and
-#      `time.parse_rfc3339_ns` is required to actually return a number (`_ns`).
-#      Non-representable dates (for example years 0000 or 9999) ->
-#      DENY_INVALID_INPUT.
-#  15. Empty strings are rejected in actor.id, actor.unit, action,
-#      resource.record_id, resource.assigned_unit, and in the exception ids and
-#      approved_by.
-#
-# Changes in 2.3.1 (audit echo sanitisation):
-#  16. Audit echoes in the output (actor_id, record_id, assignment_status,
-#      evaluated_at) are sanitised by type: the input value is reflected only
-#      if it has the contractual type; otherwise null. This does not change the
-#      decision, the reason_code or validation_errors.
-#
-# Changes in 3.0.0 (per-action authorization + trust boundary):
-#  17. New actor.allowed_actions (array of non-empty strings, required): list
-#      of actions already resolved by the corporate system (PEP data).
-#  18. New decision DENY/DENY_ACTION_NOT_ALLOWED when the input is valid
-#      but the action is not in actor.allowed_actions. Checked BEFORE unit and
-#      exceptions: an exception cannot grant a disallowed action.
-#
-# Changes in 4.0.0 (English schema):
-#  19. Every schema key, rule and helper renamed to English; the query is now
-#      data.rci.exp001.result. No change to decision semantics.
-#
-# Changes in 5.0.0 (project renamed to Freshness-aware Authorization):
-#  20. Package freshauthz.records (query data.freshauthz.records.result), rule
-#      SYS-0002-R01, reason codes without the RCI_ prefix. No change to
-#      decision semantics.
+#   2. `decision`, `reason_code` and `execution_allowed` come from a single
+#      `outcome` object, built from mutually exclusive branches, so they
+#      cannot fall out of sync.
+#   3. The action must be in `actor.allowed_actions` (resolved by the calling
+#      system) BEFORE units or exceptions are considered: an exception cannot
+#      grant a disallowed action.
+#   4. Rego does not recompute freshness, but it rejects as invalid input any
+#      contradiction between a declared status, its timestamp and its maximum
+#      age, for the assignment and for the exception source alike.
+#   5. An exception grants access only for its own actor, record and actions,
+#      within its validity window, and only if its own source is FRESH,
+#      whatever the assignment status.
+#   6. Instants are compared as nanoseconds via `time.parse_rfc3339_ns`, never
+#      as strings. Dates are validated by shape, calendar and representability
+#      (years 1678..2261) BEFORE parsing, so the policy does not abort even
+#      under --strict-builtin-errors.
+#   7. Audit echoes in the output are sanitised by type: an input value is
+#      reflected only if it has the contractual type; otherwise null.
 # =============================================================================
 
-policy_version := "5.0.0"
+policy_version := "5.0.1"
 
 # Closed enums reused in validation and logic.
 valid_statuses := {"FRESH", "STALE", "UNAVAILABLE"}

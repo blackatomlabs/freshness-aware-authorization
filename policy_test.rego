@@ -368,7 +368,7 @@ test_exception_freshness_contradicts_timestamp if {
 	count(r.validation_errors) > 0
 }
 
-# --- Hardening 2.2.0 ----------------------------------------------------------
+# --- Hardening: input root, exception window, authorised actions, calendar ---
 
 # The input root must be an object: null, string and array are invalid, and the
 # result stays defined (it does not abort).
@@ -442,7 +442,7 @@ test_actions_with_non_string_element_is_invalid if {
 	r.reason_code == "DENY_INVALID_INPUT"
 }
 
-# --- Hardening 2.3.0: date representability and empty strings -----------------
+# --- Hardening: date representability and empty strings -----------------------
 
 # Years outside the range OPA can represent as int64 ns -> invalid input, and
 # result ALWAYS defined (it does not abort, not even under --strict-builtin-errors).
@@ -573,14 +573,14 @@ test_result_always_defined_for_empty_input if {
 test_result_includes_traceability_metadata if {
 	r := data.freshauthz.records.result with input as base_input
 	r.rule == "SYS-0002-R01"
-	r.policy_version == "5.0.0"
+	r.policy_version == "5.0.1"
 	r.evaluated_at == base_input.now
 	r.actor_id == "u-001"
 	r.record_id == "rec-123"
 	r.assignment_status == "FRESH"
 }
 
-# --- Audit sanitisation 2.3.1: mistyped values -> null in the echoes, without
+# --- Audit sanitisation: mistyped values -> null in the echoes, without
 #     changing the decision or validation_errors ------------------------------
 
 test_non_string_actor_id_is_sanitised_to_null if {
@@ -627,7 +627,7 @@ _required_fields_present(r) if {
 	r.decision
 	r.reason_code
 	r.rule == "SYS-0002-R01"
-	r.policy_version == "5.0.0"
+	r.policy_version == "5.0.1"
 
 	# keys present even when their value is null/false/[]
 	object.get(r, "actor_id", "__NO__") != "__NO__"
@@ -698,7 +698,7 @@ test_exception_actions_not_an_array_is_invalid if {
 }
 
 # =============================================================================
-# 3.0.0 — Per-action authorization (actor.allowed_actions)
+# Per-action authorization (actor.allowed_actions)
 # =============================================================================
 
 # Identical exception but without the `source_status` key (to test "missing").
