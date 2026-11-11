@@ -17,7 +17,7 @@ as `SYS-0002-R01`.
 | Laboratory | Black Atom Labs · asset `SYS-0002` |
 | Research line | RL-01 · Coherence-Aware Decision & Policy Systems |
 | Status · Exposure | Reference implementation · Public |
-| Version | 5.0.1 (November 2026) |
+| Version | 5.0.2 (November 2026) |
 | Author | Antonio Tena Salguero |
 
 ---
@@ -105,7 +105,7 @@ Four decisions, seven reason codes.
 | Decision | Reason code | Executes? | When |
 |---|---|---|---|
 | `ALLOW` | `ALLOW_UNIT_MATCH` | Yes | Fresh data and the actor's unit matches the assigned one |
-| `ALLOW_WITH_EXCEPTION` | `ALLOW_EXCEPTION_APPLIED` | Yes (and it is logged) | Unit does not match, but a valid exception with a fresh source applies |
+| `ALLOW_WITH_EXCEPTION` | `ALLOW_EXCEPTION_APPLIED` | Yes (the consumer must log the exception) | Unit does not match, but a valid exception with a fresh source applies |
 | `DENY` | `DENY_UNIT_MISMATCH` | No | Fresh data, different unit, no valid exception |
 | `DENY` | `DENY_ACTION_NOT_ALLOWED` | No | The action is not among those permitted to the actor |
 | `DENY` | `DENY_SOURCE_UNAVAILABLE` | No | The assignment source is unavailable |

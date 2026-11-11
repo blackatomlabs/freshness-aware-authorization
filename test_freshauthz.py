@@ -1,4 +1,4 @@
-"""Unit tests for freshauthz (v5.0.1). Real `opa` is mocked, except in TestRealOpaIntegration."""
+"""Unit tests for freshauthz (v5.0.2). Real `opa` is mocked, except in TestRealOpaIntegration."""
 
 import json
 import math
@@ -40,7 +40,7 @@ def valid_result(**over):
         "unused_exception_present": False,
         "validation_errors": [],
         "evaluated_at": "2026-06-28T10:15:00Z",
-        "policy_version": "5.0.1",
+        "policy_version": "5.0.2",
     }
     base.update(over)
     return base
@@ -115,7 +115,7 @@ class TestValidateResult(unittest.TestCase):
 
     def test_wrong_rule(self):
         with self.assertRaises(EvaluationError):
-            self.v(valid_result(rule="OTRA"))
+            self.v(valid_result(rule="OTHER"))
 
     def test_non_string_validation_errors(self):
         with self.assertRaises(EvaluationError):
@@ -135,10 +135,10 @@ class TestValidateResult(unittest.TestCase):
                                     evaluated_at=None))
 
     def test_allow_with_inconsistent_status(self):
-        for estado in ("STALE", "UNAVAILABLE", None):
-            with self.subTest(estado=estado):
+        for status in ("STALE", "UNAVAILABLE", None):
+            with self.subTest(status=status):
                 with self.assertRaises(EvaluationError):
-                    self.v(valid_result(assignment_status=estado))
+                    self.v(valid_result(assignment_status=status))
 
     def test_action_not_allowed_is_valid(self):
         r = self.v(valid_result(decision="DENY", reason_code="DENY_ACTION_NOT_ALLOWED",
@@ -164,7 +164,7 @@ class TestValidateResult(unittest.TestCase):
 
     def test_non_rfc3339_evaluated_at_in_business_result_fails(self):
         with self.assertRaises(EvaluationError):
-            self.v(valid_result(evaluated_at="ayer"))
+            self.v(valid_result(evaluated_at="yesterday"))
 
     def test_evaluated_at_leap_second_fails(self):
         with self.assertRaises(EvaluationError):
@@ -212,11 +212,11 @@ class TestEchoes(unittest.TestCase):
 
     def test_wrong_actor(self):
         with self.assertRaises(EvaluationError):
-            self.v(valid_result(actor_id="OTRO"), valid_input())
+            self.v(valid_result(actor_id="OTHER"), valid_input())
 
     def test_wrong_record(self):
         with self.assertRaises(EvaluationError):
-            self.v(valid_result(record_id="OTRO"), valid_input())
+            self.v(valid_result(record_id="OTHER"), valid_input())
 
     def test_wrong_status(self):
         with self.assertRaises(EvaluationError):
@@ -245,9 +245,9 @@ class TestEchoes(unittest.TestCase):
         res = valid_result(decision="DENY", reason_code="DENY_INVALID_INPUT", execution_allowed=False,
                                validation_errors=["e"], actor_id=None, record_id=None,
                                assignment_status=None, evaluated_at=None)
-        for estado in ([], {}):
-            with self.subTest(tipo=type(estado).__name__):
-                self.v(res, {"resource": {"assignment_status": estado}})
+        for status in ([], {}):
+            with self.subTest(kind=type(status).__name__):
+                self.v(res, {"resource": {"assignment_status": status}})
 
 
 # ===========================================================================
@@ -298,10 +298,10 @@ class TestSerialisation(unittest.TestCase):
         self.assertIn('"a"', ri._serialise_input({"a": 1}))
 
     def test_root_not_a_dict(self):
-        for raiz in (None, [1, 2], "texto", 42, 3.5, True):
-            with self.subTest(raiz=type(raiz).__name__):
+        for root in (None, [1, 2], "text", 42, 3.5, True):
+            with self.subTest(root=type(root).__name__):
                 with self.assertRaises(EvaluationError):
-                    ri._serialise_input(raiz)
+                    ri._serialise_input(root)
 
     def test_nan_and_infinities(self):
         for val in (float("nan"), float("inf"), float("-inf")):
@@ -320,7 +320,7 @@ class TestSerialisation(unittest.TestCase):
 class TestTimeout(unittest.TestCase):
     def test_valid_values(self):
         for t in (0.1, 1, 5.0, 30):
-            ri._validate_timeout(t)  # no lanza
+            ri._validate_timeout(t)  # does not raise
 
     def test_invalid_values(self):
         for t in (0, -1, -0.5, True, False, "5", float("nan"), float("inf")):
@@ -344,27 +344,27 @@ class TestOpaResolution(unittest.TestCase):
 
     def test_missing_binary(self):
         with self.assertRaises(OPAUnavailable):
-            ri._resolve_opa("/no/existe/opa_zzz")
+            ri._resolve_opa("/does/not/exist/opa_zzz")
 
     def test_not_executable(self):
         with tempfile.NamedTemporaryFile(suffix="opa", delete=False) as f:
-            ruta = f.name
-        os.chmod(ruta, 0o644)
+            opa_file = f.name
+        os.chmod(opa_file, 0o644)
         try:
             with self.assertRaises(OPAUnavailable):
-                ri._resolve_opa(ruta)
+                ri._resolve_opa(opa_file)
         finally:
-            os.unlink(ruta)
+            os.unlink(opa_file)
 
     def test_absolute_executable_path(self):
         with tempfile.NamedTemporaryFile(suffix="opa", delete=False) as f:
-            ruta = f.name
-        os.chmod(ruta, 0o755)
+            opa_file = f.name
+        os.chmod(opa_file, 0o755)
         try:
-            resuelta = ri._resolve_opa(ruta)
-            self.assertTrue(os.path.isabs(resuelta))
+            resolved = ri._resolve_opa(opa_file)
+            self.assertTrue(os.path.isabs(resolved))
         finally:
-            os.unlink(ruta)
+            os.unlink(opa_file)
 
 
 # ===========================================================================
@@ -391,14 +391,14 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(r["decision"], "ALLOW")
 
     def test_extra_fields_are_stripped(self):
-        r = self._evaluate(valid_result(campo_extra="no-contractual", otro=123))
-        self.assertNotIn("campo_extra", r)
-        self.assertNotIn("otro", r)
+        r = self._evaluate(valid_result(extra_field="non-contractual", other=123))
+        self.assertNotIn("extra_field", r)
+        self.assertNotIn("other", r)
         self.assertEqual(set(r.keys()), set(ri._CONTRACT_FIELDS))
 
     def test_cross_check_wrong_actor(self):
         with self.assertRaises(EvaluationError):
-            self._evaluate(valid_result(actor_id="INTRUSO"))
+            self._evaluate(valid_result(actor_id="INTRUDER"))
 
     def test_custom_policy_blocked_by_default(self):
         with self.assertRaises(EvaluationError):
@@ -406,7 +406,7 @@ class TestEvaluate(unittest.TestCase):
 
     def test_missing_policy_file(self):
         with self.assertRaises(FileNotFoundError):
-            evaluate(valid_input(), policy_path="/no/existe.rego", allow_custom_policy=True)
+            evaluate(valid_input(), policy_path="/does/not/exist.rego", allow_custom_policy=True)
 
     def test_timeout_during_run(self):
         def _raise(*a, **k):
@@ -442,7 +442,7 @@ class TestEvaluate(unittest.TestCase):
 class TestPolicy(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".rego", delete=False)
-        self.tmp.write(b"package freshauthz.records\n# contenido\n")
+        self.tmp.write(b"package freshauthz.records\n# content\n")
         self.tmp.close()
         self.policy = self.tmp.name
 
@@ -494,7 +494,7 @@ class TestAudit(unittest.TestCase):
     def test_record_rejects_out_of_context_result(self):
         with self.assertRaises(EvaluationError):
             build_audit_record(
-                valid_input(), valid_result(actor_id="otro"), policy_path=self.policy
+                valid_input(), valid_result(actor_id="other"), policy_path=self.policy
             )
 
 

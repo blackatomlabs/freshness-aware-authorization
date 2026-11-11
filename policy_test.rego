@@ -89,8 +89,8 @@ test_fresh_unit_match_with_applicable_exception_flags_unused if {
 }
 
 test_fresh_unit_match_with_other_actor_exception_does_not_flag if {
-	otra := object.union(exception_valid, {"actor_id": "u-999"})
-	inp := object.union(base_input, {"exception": otra})
+	other_exception := object.union(exception_valid, {"actor_id": "u-999"})
+	inp := object.union(base_input, {"exception": other_exception})
 	r := data.freshauthz.records.result with input as inp
 	r.decision == "ALLOW"
 	r.unused_exception_present == false
@@ -113,13 +113,13 @@ test_fresh_unit_mismatch_with_valid_exception_allows_with_exception if {
 }
 
 test_exception_outside_window_does_not_apply if {
-	vencida := object.union(exception_valid, {
+	expired_exception := object.union(exception_valid, {
 		"valid_from": "2026-01-01T00:00:00Z",
 		"valid_until": "2026-01-02T00:00:00Z",
 	})
 	inp := object.union(base_input, {
 		"actor": {"id": "u-001", "unit": "UNIT_B"},
-		"exception": vencida,
+		"exception": expired_exception,
 	})
 	r := data.freshauthz.records.result with input as inp
 	r.decision == "DENY"
@@ -209,11 +209,11 @@ test_stale_with_stale_exception_does_not_compensate_escalates if {
 }
 
 test_stale_with_expired_exception_escalates if {
-	vencida := object.union(exception_valid, {
+	expired_exception := object.union(exception_valid, {
 		"valid_from": "2026-01-01T00:00:00Z",
 		"valid_until": "2026-01-02T00:00:00Z",
 	})
-	inp := object.union(base_input, {"resource": stale_resource, "exception": vencida})
+	inp := object.union(base_input, {"resource": stale_resource, "exception": expired_exception})
 	r := data.freshauthz.records.result with input as inp
 	r.decision == "ESCALATE"
 	r.reason_code == "ESCALATE_STALE_ASSIGNMENT"
@@ -315,7 +315,7 @@ test_now_not_rfc3339_is_invalid_input if {
 }
 
 test_exception_with_invalid_timestamp_is_invalid_input if {
-	exc := object.union(exception_valid, {"valid_until": "ayer"})
+	exc := object.union(exception_valid, {"valid_until": "yesterday"})
 	inp := object.union(base_input, {"actor": {"id": "u-001", "unit": "UNIT_B"}, "exception": exc})
 	r := data.freshauthz.records.result with input as inp
 	r.reason_code == "DENY_INVALID_INPUT"
@@ -380,7 +380,7 @@ test_null_root_is_invalid_input if {
 }
 
 test_string_root_is_invalid_input if {
-	r := data.freshauthz.records.result with input as "texto"
+	r := data.freshauthz.records.result with input as "text"
 	is_object(r)
 	r.reason_code == "DENY_INVALID_INPUT"
 }
@@ -573,7 +573,7 @@ test_result_always_defined_for_empty_input if {
 test_result_includes_traceability_metadata if {
 	r := data.freshauthz.records.result with input as base_input
 	r.rule == "SYS-0002-R01"
-	r.policy_version == "5.0.1"
+	r.policy_version == "5.0.2"
 	r.evaluated_at == base_input.now
 	r.actor_id == "u-001"
 	r.record_id == "rec-123"
@@ -627,7 +627,7 @@ _required_fields_present(r) if {
 	r.decision
 	r.reason_code
 	r.rule == "SYS-0002-R01"
-	r.policy_version == "5.0.1"
+	r.policy_version == "5.0.2"
 
 	# keys present even when their value is null/false/[]
 	object.get(r, "actor_id", "__NO__") != "__NO__"
@@ -791,7 +791,7 @@ test_unavailable_with_fresh_exception_still_source_unavailable if {
 }
 
 test_exception_as_string_is_invalid if {
-	inp := object.union(base_input, {"actor": {"unit": "UNIT_B"}, "exception": "no-soy-objeto"})
+	inp := object.union(base_input, {"actor": {"unit": "UNIT_B"}, "exception": "not-an-object"})
 	r := data.freshauthz.records.result with input as inp
 	r.reason_code == "DENY_INVALID_INPUT"
 }

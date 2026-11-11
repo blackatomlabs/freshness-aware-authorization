@@ -1,6 +1,6 @@
 # Policy contract — Freshness-aware Authorization (rule SYS-0002-R01)
 
-> **Policy version: 5.0.1.** Version history is at the end, under **Changelog**.
+> **Policy version: 5.0.2.** Version history is at the end, under **Changelog**.
 >
 > **Specialised PDP.** This project decides record access based on an **already resolved** action authorization, unit match, assignment freshness and approved exceptions. It runs **behind a trusted PEP/backend** that builds the entire input (identity from IAM, already resolved permissions, assignment from the records system, exception from an authorised store, and server time). **The end client never builds the input.** The policy does not authenticate, does not manage identities or roles, does not compute permissions, does not query databases and does not administer exceptions: it only checks consistency and applicability over trusted data.
 
@@ -104,7 +104,7 @@ The policy **always** returns a structured, complete `result` object (query `dat
   "unused_exception_present": false,
   "validation_errors": [],
   "evaluated_at": "2026-06-28T10:15:00Z",
-  "policy_version": "5.0.1"
+  "policy_version": "5.0.2"
 }
 ```
 
@@ -216,6 +216,14 @@ The `freshauthz.py` module wraps `opa eval` via subprocess and adds guarantees a
 
 ## Changelog
 
+### 5.0.2
+
+Tests and documentation only. The decision logic, the reason codes and the input/output schema are unchanged; `policy_version` now reports `5.0.2`.
+
+- Remaining Spanish names of local variables and test values in `policy_test.rego` and `test_freshauthz.py` renamed to English.
+- README: `ALLOW_WITH_EXCEPTION` executes and the consumer must log the exception; the policy itself does not log.
+- The 5.0.1 entry below no longer lists the Python requirement among the corrections: the earlier wording was correct and was only reworded.
+
 ### 5.0.1
 
 Documentation and CI only. The decision logic, the reason codes and the input/output schema are unchanged; `policy_version` now reports `5.0.1`.
@@ -223,7 +231,7 @@ Documentation and CI only. The decision logic, the reason codes and the input/ou
 - The version history of earlier, unpublished versions was removed from this contract and from the header of `policy.rego`.
 - CI now verifies the OPA binary against a SHA-256 checksum pinned in the workflow.
 - Contract wording aligned with the maturity label: this is a reference implementation.
-- README corrections: copyright notice, Python requirement, coverage figure and CI description.
+- README corrections: copyright notice, coverage figure and CI description. The Python requirement was reworded.
 
 ### 5.0.0
 

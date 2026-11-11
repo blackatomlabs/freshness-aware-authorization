@@ -31,7 +31,7 @@ import rego.v1
 #      reflected only if it has the contractual type; otherwise null.
 # =============================================================================
 
-policy_version := "5.0.1"
+policy_version := "5.0.2"
 
 # Closed enums reused in validation and logic.
 valid_statuses := {"FRESH", "STALE", "UNAVAILABLE"}
